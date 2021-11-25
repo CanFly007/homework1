@@ -40,8 +40,8 @@ highp float rand_2to1(vec2 uv ) {
 	return fract(sin(sn) * c);
 }
 
-float unpack(vec4 rgbaDepth) {
-    const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0*256.0), 1.0/(256.0*256.0*256.0));
+float unpack(vec4 rgbaDepth) {    
+    const vec4 bitShift = vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0);
     return dot(rgbaDepth, bitShift);
 }
 
@@ -105,7 +105,14 @@ float PCSS(sampler2D shadowMap, vec4 coords){
 
 
 float useShadowMap(sampler2D shadowMap, vec4 shadowCoord){
-  return 1.0;
+  vec4 rgbaDepth = texture2D(shadowMap, shadowCoord.xy);
+  float closestDepth = unpack(rgbaDepth);
+  //return shadowCoord.z - zBuffer;
+  //if(shadowCoord.z - 0.55 < 0.0) discard;
+  //if(zBuffer - 0.0 < 0.545) discard;
+  //return 1.0;//shadowCoord.z;
+  float shadow = closestDepth + 0.01 < shadowCoord.z ? 0.0 : 1.0;
+  return shadow;
 }
 
 vec3 blinnPhong() {
@@ -134,12 +141,24 @@ vec3 blinnPhong() {
 void main(void) {
 
   float visibility;
-  //visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
+  //vec3 shadowCoord = vec3((vPositionFromLight.x + 1.0) / 2.0, (vPositionFromLight.y + 1.0) / 2.0, (vPositionFromLight.z + 1.0) / 2.0);
+  //vec3 shadowCoord = (vPositionFromLight.xyz + 1.0) / 2.0;
+  vec4 shadowCoord = vPositionFromLight.xyzw / vPositionFromLight.w;
+  shadowCoord.xyz = vPositionFromLight.xyz * 0.5 + 0.5;
+
+  visibility = useShadowMap(uShadowMap, vec4(shadowCoord.xyz, 1.0));
   //visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
   //visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
 
   vec3 phongColor = blinnPhong();
+  
+  //if(shadowCoord.z - 0.56 < 0.0) discard;
 
-  //gl_FragColor = vec4(phongColor * visibility, 1.0);
-  gl_FragColor = vec4(phongColor, 1.0);
+  gl_FragColor = vec4(shadowCoord.xyz,1.0);
+  gl_FragColor = vec4(phongColor * visibility, 1.0);
+  
+  //gl_FragColor = vec4(shadowCoord.z,0.0,0.0,1.0);
+
+  //gl_FragColor = vec4(visibility,0.0,0.0,1.0);
+  //gl_FragColor = vec4(phongColor, 1.0);
 }
